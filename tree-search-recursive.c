@@ -4,7 +4,8 @@
 #include <omp.h>
 #include <GL/glut.h>
 
-#define N 5 /**Numero de particulas**/
+#define N 12 /**Numero de particulas**/
+#define thread_count 4 /**Numero de threads**/
 const double G = 6.673e-11f; /**Constante de Gravedad**/
 
 static double digraph[N][N];
@@ -24,7 +25,8 @@ void solve(double t[N][2], int last, int n){
 			best_cost=t[(int)t[last][0]][1];
 		}				
 	}
-	else{
+	else{	
+		//#pragma omp parallel for schedule(dynamic, 1)
 		for (int i = 1; i < N; i++)
 		{
 			if (t[i][1]==0)
@@ -57,10 +59,31 @@ void start(){
 		best_tour[i][0] = 0;
 		best_tour[i][1] = 0;
 	}
+	best_cost=RAND_MAX;
 	printf("Procesando...\n");
 	double time0 = omp_get_wtime();
     solve(tour, 0, 1);
 	double time1 = omp_get_wtime();
+	/*
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+		{
+			printf("%.2f\t",digraph[i][j]);	
+		}
+			printf("\n");	
+	}
+			printf("\n");	
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < 2; j++)
+		{
+			printf("%.2f\t",best_tour[i][j]);	
+		}
+			printf("\n");	
+	}*/
+			printf("DISTANCIA MINIMA %f\n",best_cost);	
+	
 	/**Impresion del tiempo que tardo el algoritmo para determinar las
 	 * posiciones y velocidades de las particulas ***/
 	printf("duracion: %f\n",time1-time0);	
@@ -101,12 +124,12 @@ int main(int argc, char **argv){
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowPosition(1, 1);
 	glutInitWindowSize(700, 700);
-	glutCreateWindow("N BODY");
+	//glutCreateWindow("N BODY");
 	init();
-	glutDisplayFunc(display); 
-	glutIdleFunc(idle);
-	glutReshapeFunc(reshape);
-	glutMainLoop();
+	//glutDisplayFunc(display); 
+	//glutIdleFunc(idle);
+	//glutReshapeFunc(reshape);
+	//glutMainLoop();
 	return 0;
 }
 
