@@ -6,6 +6,7 @@
 #include <GL/glut.h>
 
 #define N 12 /**Numero de CIUDADES**/
+#define NO_CONNECTED 0 /**Display**/
 #define WIDTH 700 /**Display**/
 #define HEIGHT 700 /**Display**/
 #define thread_count 4 /**Numero de threads**/
@@ -19,8 +20,34 @@ typedef struct Tour{
 	int n;
 }tour;
 
+typedef struct STACK{
+	tour *content;
+	int top;
+	int max;
+}Stack;
+
+void push(Stack *s, tour city){
+	s->top++;
+	if (s->top==s->max){	
+		s->content = realloc(s->content,(N+s->max)*sizeof(tour));
+		s->max += N;
+	}
+	s->content[s->top] = city;
+	//printf("push: %d\n",s->content[s->top]);
+}
+
+tour pop(Stack *s){
+	if (0<=s->top){	
+		s->top--;
+		return s->content[s->top+1];
+	}
+	tour tmp;
+	return tmp;
+}
+
 static double digraph[N][N];
 static double point[N][2];
+static Stack *stack;
 static tour *best_tour;
 tour t1;
 
@@ -54,7 +81,7 @@ void copy(tour *t, tour *t2){
 }
 
 int feasible(tour t, int city){
-	if (t.path[city] || t.path[t.last]==city) return 0;
+	if (t.path[city] || t.path[t.last]==city || digraph[t.path[t.last]][city]==NO_CONNECTED) return 0;
 	return 1;
 }
 
@@ -63,22 +90,25 @@ void display();
 void reshape(int width, int height) ;
 
 void TSP(tour t){
-	if (t.n==N){
-		if (t.cost<best_tour->cost){
-			copy(best_tour, &t);			
-			display();
-			reshape(WIDTH, HEIGHT);
-		}				
-	}
-	else{	
-		//#pragma omp parallel for schedule(dynamic, 1)
-		for (int i = 1; i < N; i++)
-		{
-			if (feasible(t,i)){
-				add_city(&t, i);
-				TSP(t);
-				remove_last_city(&t);
-			}	
+	push(stack, t);
+	while (0<=stack->top){
+		tour city=pop(stack);
+		if (city.n==N){
+			if (city.cost<best_tour->cost){
+				copy(best_tour, &city);			
+				display();
+				reshape(WIDTH, HEIGHT);					
+			}
+		}
+		else{
+			for (int i=N-1; 1<=i; i--){
+				if (feasible(city,i)){
+					add_city(&city, i);
+					push(stack, city);
+					remove_last_city(&city);
+				}
+			}
+		
 		}	
 	}
 }
@@ -86,6 +116,7 @@ void TSP(tour t){
  
 void start(){	
 	best_tour= malloc(sizeof(tour));
+	stack= malloc(sizeof(Stack));
 	for(int i=0;i<N;i++){
 		digraph[i][i] = 0;
 		point[i][0] = Ranf( -G, G );
@@ -106,6 +137,18 @@ void start(){
 	t1.last = 0;
 	t1.first = 0;
 	t1.n = 1;	
+	stack->max = N*((N-1)*0.5);
+	stack->top = -1;
+	stack->content = malloc((stack->max)*sizeof(tour));
+}
+
+void disconnect(){	
+	for(int i=0;i<3;i++){
+		int a = rand()%N;
+		int b = rand()%N;
+		digraph[a][b] = NO_CONNECTED;
+		digraph[b][a] = NO_CONNECTED;
+	}
 }
  
 void init(){
@@ -126,10 +169,12 @@ void display(){
     glLoadIdentity();
 	for(int i=0;i<N;i++){
 		for (int j = 0; j < N; j++){
+			if (digraph[i][j]!=NO_CONNECTED){
 			glBegin(GL_LINES);
 				glVertex3f(point[i][0], point[i][1], 0.0f);
 				glVertex3f(point[j][0], point[j][1], 0.0f);
 			glEnd(); 			
+			}
 		} 
 	}	
     glColor3f(1,1,1);	
@@ -154,7 +199,8 @@ void idle(){
 
 int main(int argc, char **argv){
 	srand(time(NULL));
-    start();
+    start();  
+    disconnect();    
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowPosition(1, 1);

@@ -6,10 +6,34 @@
 #include <GL/glut.h>
 
 #define N 12 /**Numero de CIUDADES**/
+#define NO_CITY 0 /**Display**/
 #define WIDTH 700 /**Display**/
 #define HEIGHT 700 /**Display**/
 #define thread_count 4 /**Numero de threads**/
 const double G = 16; /**Constante de ESPACIO**/
+
+typedef struct STACK{
+	int *content;
+	int top;
+	int max;
+}Stack;
+
+void push(Stack *s, int city){
+	s->top++;
+	if (s->top==s->max){	
+		s->content = realloc(s->content,(N+s->max)*sizeof(int));
+		s->max += N;
+	}
+	s->content[s->top] = city;
+	//printf("push: %d\n",s->content[s->top]);
+}
+int pop(Stack *s){
+	if (0<=s->top){	
+		s->top--;
+		return s->content[s->top+1];
+	}
+	return -1;
+}
 
 typedef struct Tour{
 	double cost;
@@ -21,6 +45,7 @@ typedef struct Tour{
 
 static double digraph[N][N];
 static double point[N][2];
+static Stack *stack;
 static tour *best_tour;
 tour t1;
 
@@ -63,29 +88,38 @@ void display();
 void reshape(int width, int height) ;
 
 void TSP(tour t){
-	if (t.n==N){
-		if (t.cost<best_tour->cost){
-			copy(best_tour, &t);			
-			display();
-			reshape(WIDTH, HEIGHT);
-		}				
-	}
-	else{	
-		//#pragma omp parallel for schedule(dynamic, 1)
-		for (int i = 1; i < N; i++)
-		{
-			if (feasible(t,i)){
-				add_city(&t, i);
-				TSP(t);
+	for (int i=N-1; 1<=i; i--)
+		push(stack, i);
+	while (0<=stack->top){
+		int city=pop(stack);
+		if (city==NO_CITY)
+			remove_last_city(&t);
+		else{
+			add_city(&t, city);
+			if (t.n==N){
+				if (t.cost<best_tour->cost){
+					copy(best_tour, &t);			
+					display();
+					reshape(WIDTH, HEIGHT);					
+				}
 				remove_last_city(&t);
-			}	
-		}	
+			}
+			else{
+				push(stack, NO_CITY);
+				for (int i=N-1; 1<=i; i--){
+					if (feasible(t,i)){
+						push(stack, i);
+					}
+				}
+			}
+		}		
 	}
 }
  
  
 void start(){	
 	best_tour= malloc(sizeof(tour));
+	stack= malloc(sizeof(Stack));
 	for(int i=0;i<N;i++){
 		digraph[i][i] = 0;
 		point[i][0] = Ranf( -G, G );
@@ -106,6 +140,9 @@ void start(){
 	t1.last = 0;
 	t1.first = 0;
 	t1.n = 1;	
+	stack->max = N*((N-1)*0.5);
+	stack->top = -1;
+	stack->content = malloc((stack->max)*sizeof(int));
 }
  
 void init(){
@@ -154,7 +191,7 @@ void idle(){
 
 int main(int argc, char **argv){
 	srand(time(NULL));
-    start();
+    start();    
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowPosition(1, 1);
@@ -170,6 +207,7 @@ int main(int argc, char **argv){
     TSP(t1);
 	double time1 = omp_get_wtime();		
 	printf("Costo: %f\n",best_tour->cost);
+	printf("stack: %d\n",stack->max);
 	/**Impresion del tiempo que tardo el algoritmo para determinar las
 	 * posiciones y velocidades de las particulas ***/
 	printf("duracion: %f\n",time1-time0);	
